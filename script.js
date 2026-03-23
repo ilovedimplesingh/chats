@@ -1,13 +1,20 @@
 const chatContainer = document.getElementById("chat-container");
 const viewerSelect = document.getElementById("viewer");
 
-// safety check
-if (!chatContainer || !viewerSelect) {
-  console.error("Missing HTML elements");
+// safety
+if (!chatContainer) {
+  console.error("Chat container missing");
 }
 
 // viewer
 let VIEWER = viewerSelect ? viewerSelect.value : "Mehul";
+
+if (viewerSelect) {
+  viewerSelect.addEventListener("change", () => {
+    VIEWER = viewerSelect.value;
+    resetChat();
+  });
+}
 
 let allMessages = [];
 let currentIndex = 0;
@@ -18,13 +25,8 @@ const imageExt = [".jpg", ".jpeg", ".png", ".webp"];
 const videoExt = [".mp4", ".webm", ".ogg"];
 const docExt = [".pdf", ".doc", ".docx", ".ppt", ".pptx", ".xls", ".xlsx", ".zip"];
 
-// viewer change
-if (viewerSelect) {
-  viewerSelect.addEventListener("change", () => {
-    VIEWER = viewerSelect.value;
-    resetChat();
-  });
-}
+// 🔥 FILE LIST (EDIT THIS)
+const files = ["chat1.txt", "chat2.txt"]; // add more if needed
 
 // detect file type
 function getFileType(message) {
@@ -37,39 +39,54 @@ function getFileType(message) {
   return "text";
 }
 
-// 🔥 LOAD CHAT (SINGLE FILE ONLY)
-fetch("chats/chat.txt")
-  .then(res => {
-    console.log("Fetch status:", res.status);
-    return res.text();
-  })
-  .then(data => {
+// 🔥 LOAD ALL FILES
+async function loadAllChats() {
+  let combinedData = "";
 
-    if (!data) {
-      console.error("Empty chat file");
-      return;
+  for (let file of files) {
+    try {
+      const res = await fetch("chats/" + file);
+
+      console.log("Fetching:", file, "Status:", res.status);
+
+      if (!res.ok) {
+        console.error("File not found:", file);
+        continue;
+      }
+
+      const text = await res.text();
+      combinedData += text + "\n";
+
+    } catch (err) {
+      console.error("Error loading:", file, err);
     }
+  }
 
-    // 🔥 FIX MERGED MESSAGES
-    data = data.replace(
-      /(\d{2}\/\d{2}\/\d{4}, \d{1,2}:\d{2} - )/g,
-      "\n$1"
-    );
+  if (!combinedData) {
+    console.error("No chat data loaded");
+    return;
+  }
 
-    allMessages = parseChat(data);
+  // 🔥 FIX MERGED MESSAGES
+  combinedData = combinedData.replace(
+    /(\d{2}\/\d{2}\/\d{4}, \d{1,2}:\d{2} - )/g,
+    "\n$1"
+  );
 
-    console.log("TOTAL MESSAGES:", allMessages.length);
+  allMessages = parseChat(combinedData);
 
-    if (allMessages.length === 0) {
-      console.error("Parsing failed");
-      return;
-    }
+  console.log("TOTAL MESSAGES:", allMessages.length);
 
-    resetChat();
-  })
-  .catch(err => {
-    console.error("Fetch error:", err);
-  });
+  if (allMessages.length === 0) {
+    console.error("Parsing failed");
+    return;
+  }
+
+  resetChat();
+}
+
+// 🚀 START
+loadAllChats();
 
 // 🔥 FLEXIBLE PARSER
 function parseChat(data) {
@@ -98,7 +115,7 @@ function resetChat() {
   loadInitialMessages();
 }
 
-// load latest
+// load newest
 function loadInitialMessages() {
   const start = Math.max(0, currentIndex - CHUNK_SIZE);
   const slice = allMessages.slice(start, currentIndex);
@@ -112,9 +129,9 @@ function loadInitialMessages() {
   chatContainer.scrollTop = chatContainer.scrollHeight;
 }
 
-// scroll up load
+// scroll up → load older
 chatContainer.addEventListener("scroll", () => {
-  if (chatContainer.scrollTop <= 10) { // FIXED
+  if (chatContainer.scrollTop <= 10) {
     loadOlderMessages();
   }
 });
@@ -141,7 +158,6 @@ function createMessage(sender, message, time, prepend) {
   const msgDiv = document.createElement("div");
 
   const isViewer = sender === VIEWER;
-
   msgDiv.className = "message " + (isViewer ? "me" : "other");
 
   const fileType = getFileType(message);
@@ -170,7 +186,7 @@ function createMessage(sender, message, time, prepend) {
   }
 
   else {
-    msgDiv.textContent = message; // safer than innerHTML
+    msgDiv.textContent = message;
   }
 
   const timeDiv = document.createElement("div");
