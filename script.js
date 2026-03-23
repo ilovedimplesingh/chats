@@ -1,17 +1,34 @@
 const chatContainer = document.getElementById("chat-container");
 const viewerSelect = document.getElementById("viewer");
 
-// safety
-if (!chatContainer) {
-  console.error("Chat container missing");
-}
+// NEW UI elements
+const dp = document.getElementById("dp");
+const chatName = document.getElementById("chat-name");
+const scrollBtn = document.getElementById("scroll-bottom");
+const floatingDate = document.getElementById("floating-date");
 
 // viewer
 let VIEWER = viewerSelect ? viewerSelect.value : "Mehul";
 
+// update header
+function updateHeader() {
+  if (!dp || !chatName) return;
+
+  if (VIEWER === "Mehul") {
+    chatName.innerText = "Dimp";
+    dp.src = "media/dimp.jpg";
+  } else {
+    chatName.innerText = "Mehul";
+    dp.src = "media/mehul.jpg";
+  }
+}
+
+updateHeader();
+
 if (viewerSelect) {
   viewerSelect.addEventListener("change", () => {
     VIEWER = viewerSelect.value;
+    updateHeader();
     resetChat();
   });
 }
@@ -25,34 +42,28 @@ const imageExt = [".jpg", ".jpeg", ".png", ".webp"];
 const videoExt = [".mp4", ".webm", ".ogg", ".opus"];
 const docExt = [".pdf", ".doc", ".docx", ".ppt", ".pptx", ".xls", ".xlsx", ".zip"];
 
-// 🔥 FILE LIST (EDIT THIS)
-const files = ["chat1.txt", "chat2.txt", "chat3.txt", "chat4.txt", "chat5.txt"]; // add more if needed
+// FILES
+const files = ["chat1.txt", "chat2.txt", "chat3.txt", "chat4.txt", "chat5.txt"];
 
 // detect file type
 function getFileType(message) {
   const lower = message.toLowerCase();
-
   if (imageExt.some(ext => lower.endsWith(ext))) return "image";
   if (videoExt.some(ext => lower.endsWith(ext))) return "video";
   if (docExt.some(ext => lower.endsWith(ext))) return "doc";
-
   return "text";
 }
 
-// 🔥 LOAD ALL FILES
+// LOAD FILES
 async function loadAllChats() {
   let combinedData = "";
 
   for (let file of files) {
     try {
       const res = await fetch("chats/" + file);
-
       console.log("Fetching:", file, "Status:", res.status);
 
-      if (!res.ok) {
-        console.error("File not found:", file);
-        continue;
-      }
+      if (!res.ok) continue;
 
       const text = await res.text();
       combinedData += text + "\n";
@@ -62,36 +73,26 @@ async function loadAllChats() {
     }
   }
 
-  if (!combinedData) {
-    console.error("No chat data loaded");
-    return;
-  }
+  if (!combinedData) return;
 
-  // 🔥 FIX MERGED MESSAGES
+  // fix merged lines
   combinedData = combinedData.replace(
     /(\d{2}\/\d{2}\/\d{4}, \d{1,2}:\d{2} - )/g,
     "\n$1"
   );
 
   allMessages = parseChat(combinedData);
-
   console.log("TOTAL MESSAGES:", allMessages.length);
-
-  if (allMessages.length === 0) {
-    console.error("Parsing failed");
-    return;
-  }
 
   resetChat();
 }
 
-// 🚀 START
+// START
 loadAllChats();
 
-// 🔥 FLEXIBLE PARSER
+// PARSER (now includes date)
 function parseChat(data) {
   const lines = data.split("\n");
-
   const regex = /^(.+?), (.+?) - (.*?): (.*)$/;
 
   return lines
@@ -100,6 +101,7 @@ function parseChat(data) {
       if (!match) return null;
 
       return {
+        date: match[1],
         time: match[2],
         sender: match[3],
         message: match[4].trim()
@@ -112,30 +114,53 @@ function parseChat(data) {
 function resetChat() {
   chatContainer.innerHTML = "";
   currentIndex = allMessages.length;
+  lastDate = null;
   loadInitialMessages();
 }
+
+// date tracking
+let lastDate = null;
 
 // load newest
 function loadInitialMessages() {
   const start = Math.max(0, currentIndex - CHUNK_SIZE);
   const slice = allMessages.slice(start, currentIndex);
 
-  slice.forEach(msg => {
-    createMessage(msg.sender, msg.message, msg.time, false);
-  });
+  slice.forEach(msg => renderWithDate(msg, false));
 
   currentIndex = start;
-
   chatContainer.scrollTop = chatContainer.scrollHeight;
 }
 
-// scroll up → load older
+// scroll
 chatContainer.addEventListener("scroll", () => {
-  if (chatContainer.scrollTop <= 10) {
-    loadOlderMessages();
+  if (chatContainer.scrollTop <= 10) loadOlderMessages();
+
+  // scroll button
+  if (scrollBtn) {
+    if (chatContainer.scrollTop < chatContainer.scrollHeight - 600) {
+      scrollBtn.style.display = "block";
+    } else {
+      scrollBtn.style.display = "none";
+    }
+  }
+
+  // floating date
+  if (floatingDate) {
+    const visible = document.querySelector(".date-separator");
+    if (visible) {
+      floatingDate.innerText = visible.innerText;
+      floatingDate.style.display = "block";
+
+      clearTimeout(window.dateTimeout);
+      window.dateTimeout = setTimeout(() => {
+        floatingDate.style.display = "none";
+      }, 1000);
+    }
   }
 });
 
+// load older
 function loadOlderMessages() {
   if (currentIndex <= 0) return;
 
@@ -144,13 +169,26 @@ function loadOlderMessages() {
   const start = Math.max(0, currentIndex - CHUNK_SIZE);
   const slice = allMessages.slice(start, currentIndex);
 
-  slice.reverse().forEach(msg => {
-    createMessage(msg.sender, msg.message, msg.time, true);
-  });
+  slice.reverse().forEach(msg => renderWithDate(msg, true));
 
   currentIndex = start;
-
   chatContainer.scrollTop = chatContainer.scrollHeight - prevHeight;
+}
+
+// render with date separator
+function renderWithDate(msg, prepend) {
+  if (msg.date !== lastDate) {
+    const dateDiv = document.createElement("div");
+    dateDiv.className = "date-separator";
+    dateDiv.innerText = msg.date;
+
+    if (prepend) chatContainer.prepend(dateDiv);
+    else chatContainer.appendChild(dateDiv);
+
+    lastDate = msg.date;
+  }
+
+  createMessage(msg.sender, msg.message, msg.time, prepend);
 }
 
 // create message
@@ -166,6 +204,16 @@ function createMessage(sender, message, time, prepend) {
   if (fileType === "image") {
     const img = document.createElement("img");
     img.src = filePath;
+
+    // fullscreen
+    img.onclick = () => {
+      const overlay = document.createElement("div");
+      overlay.className = "overlay";
+      overlay.innerHTML = `<img src="${filePath}">`;
+      overlay.onclick = () => overlay.remove();
+      document.body.appendChild(overlay);
+    };
+
     msgDiv.appendChild(img);
   }
 
@@ -195,9 +243,28 @@ function createMessage(sender, message, time, prepend) {
 
   msgDiv.appendChild(timeDiv);
 
-  if (prepend) {
-    chatContainer.prepend(msgDiv);
-  } else {
-    chatContainer.appendChild(msgDiv);
-  }
+  if (prepend) chatContainer.prepend(msgDiv);
+  else chatContainer.appendChild(msgDiv);
+}
+
+// scroll button click
+if (scrollBtn) {
+  scrollBtn.onclick = () => {
+    chatContainer.scrollTop = chatContainer.scrollHeight;
+  };
+}
+
+// SEARCH
+const searchInput = document.getElementById("search");
+
+if (searchInput) {
+  searchInput.addEventListener("input", e => {
+    const value = e.target.value.toLowerCase();
+
+    document.querySelectorAll(".message").forEach(msg => {
+      msg.style.display = msg.innerText.toLowerCase().includes(value)
+        ? "block"
+        : "none";
+    });
+  });
 }
