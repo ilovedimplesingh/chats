@@ -1,3 +1,5 @@
+document.addEventListener("DOMContentLoaded", () => {
+
 const chatContainer = document.getElementById("chat-container");
 const viewerSelect = document.getElementById("viewer");
 
@@ -268,3 +270,5 @@ if (searchInput) {
     });
   });
 }
+
+});
