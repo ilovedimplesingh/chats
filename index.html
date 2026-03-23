@@ -2,27 +2,45 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Chat Viewer</title>
+  <title>WhatsApp Chat Viewer</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
 <div class="app">
+
+  <!-- 🔝 HEADER -->
   <div class="header">
-    <h2>Dimp 💚</h2>
+    <img id="dp" class="dp" src="">
+    <span id="chat-name"></span>
   </div>
 
+  <!-- 👤 VIEWER SELECT -->
   <div class="viewer-select">
-  <label>Who is viewing?</label>
-  <select id="viewer">
-    <option value="Mehul">Mehul</option>
-    <option value="Dimp">Dimp</option>
-  </select>
-</div>
+    <label>Viewing as:</label>
+    <select id="viewer">
+      <option value="Mehul">Mehul</option>
+      <option value="Dimp">Dimp</option>
+    </select>
+  </div>
 
+  <!-- 🔍 SEARCH -->
+  <div class="search-box">
+    <input type="text" id="search" placeholder="Search chat...">
+  </div>
+
+  <!-- 📅 FLOATING DATE -->
+  <div id="floating-date"></div>
+
+  <!-- 💬 CHAT -->
   <div id="chat-container"></div>
+
+  <!-- ⬇️ SCROLL TO BOTTOM -->
+  <button id="scroll-bottom">⬇️</button>
+
 </div>
 
 <script src="script.js"></script>
+
 </body>
 </html>
