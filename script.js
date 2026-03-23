@@ -22,11 +22,11 @@ const CHUNK_SIZE = 200;
 
 // file types
 const imageExt = [".jpg", ".jpeg", ".png", ".webp"];
-const videoExt = [".mp4", ".webm", ".ogg"];
+const videoExt = [".mp4", ".webm", ".ogg", ".opus"];
 const docExt = [".pdf", ".doc", ".docx", ".ppt", ".pptx", ".xls", ".xlsx", ".zip"];
 
 // 🔥 FILE LIST (EDIT THIS)
-const files = ["chat1.txt", "chat2.txt"]; // add more if needed
+const files = ["chat1.txt", "chat2.txt", "chat3.txt", "chat4.txt", "chat5.txt"]; // add more if needed
 
 // detect file type
 function getFileType(message) {
