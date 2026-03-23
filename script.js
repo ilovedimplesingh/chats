@@ -27,12 +27,31 @@ function getFileType(message) {
 }
 
 // 🔥 Load chat file
-fetch("chats/chats/chat.txt")
-  .then(res => res.text())
-  .then(data => {
-    allMessages = parseChat(data);
-    resetChat();
-  });
+const files = ["chat1.txt"]; // your files
+
+async function loadAllChats() {
+  let combinedData = "";
+
+  for (let file of files) {
+    try {
+      const res = await fetch("chats/" + file);
+      const text = await res.text();
+      combinedData += text + "\n";
+    } catch (err) {
+      console.error("Error loading:", file, err);
+    }
+  }
+
+  console.log("ALL DATA LENGTH:", combinedData.length);
+
+  allMessages = parseChat(combinedData);
+  console.log("TOTAL MESSAGES:", allMessages.length);
+
+  resetChat();
+}
+
+// 🔥 CALL THIS AT THE END
+loadAllChats();
 
 // Parse
 function parseChat(data) {
@@ -153,3 +172,5 @@ function createMessage(sender, message, time, prepend) {
     chatContainer.appendChild(msgDiv);
   }
 }
+
+console.log("FILES:", files);
