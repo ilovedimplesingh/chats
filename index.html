@@ -7,30 +7,42 @@
 </head>
 <body>
 
-<div class="app">
+<div class="app" id="app">
 
   <!-- 🔝 HEADER -->
-<div class="header">
-  <img id="dp" class="dp" src="">
-  <span id="chat-name"></span>
-</div>
+  <div class="header">
+    <img id="dp" class="dp" src="" alt="">
+    <span id="chat-name"></span>
 
-<div class="viewer-select">
-  <select id="viewer">
-    <option value="Mehul">Mehul</option>
-    <option value="Dimp">Dimp</option>
-  </select>
-</div>
+    <div class="header-actions">
+      <button id="menu-btn" class="icon-btn" aria-label="More options">⋮</button>
+      <div id="header-menu" class="header-menu hidden">
+        <button id="menu-search" type="button">Search</button>
+      </div>
+    </div>
+  </div>
 
-<div class="search-box">
-  <input type="text" id="search" placeholder="Search...">
-</div>
+  <div class="viewer-select">
+    <select id="viewer">
+      <option value="Mehul">Mehul</option>
+      <option value="Dimp">Dimp</option>
+    </select>
+  </div>
 
-<div id="floating-date"></div>
+  <div class="search-box hidden" id="search-box">
+    <input type="text" id="search" placeholder="Search...">
+    <div class="search-nav">
+      <button id="search-up" class="icon-btn" aria-label="Previous result">⬆️</button>
+      <button id="search-down" class="icon-btn" aria-label="Next result">⬇️</button>
+      <button id="search-close" class="icon-btn" aria-label="Close search">✕</button>
+    </div>
+  </div>
 
-<div id="chat-container"></div>
+  <div id="floating-date"></div>
 
-<button id="scroll-bottom">⬇️</button>
+  <div id="chat-container"></div>
+
+  <button id="scroll-bottom">⬇️</button>
 
 </div>
 

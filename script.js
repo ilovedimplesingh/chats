@@ -1,12 +1,21 @@
 document.addEventListener("DOMContentLoaded", () => {
+  const app = document.getElementById("app");
   const chatContainer = document.getElementById("chat-container");
   const viewerSelect = document.getElementById("viewer");
   const searchInput = document.getElementById("search");
+  const searchBox = document.getElementById("search-box");
+  const searchUpBtn = document.getElementById("search-up");
+  const searchDownBtn = document.getElementById("search-down");
+  const searchCloseBtn = document.getElementById("search-close");
 
   const dp = document.getElementById("dp");
   const chatName = document.getElementById("chat-name");
   const scrollBtn = document.getElementById("scroll-bottom");
   const floatingDate = document.getElementById("floating-date");
+
+  const menuBtn = document.getElementById("menu-btn");
+  const headerMenu = document.getElementById("header-menu");
+  const menuSearchBtn = document.getElementById("menu-search");
 
   let VIEWER = viewerSelect ? viewerSelect.value : "Mehul";
 
@@ -16,10 +25,17 @@ document.addEventListener("DOMContentLoaded", () => {
   const docExt = [".pdf", ".doc", ".docx", ".ppt", ".pptx", ".xls", ".xlsx", ".zip"];
   const files = ["chat1.txt", "chat2.txt", "chat3.txt", "chat4.txt", "chat5.txt"];
 
+  const viewerWallpapers = {
+    Mehul: "media/mehulchat.jpg",
+    Dimp: "media/dimpchat.jpg"
+  };
+
   let allMessages = [];
   let filteredMessages = [];
   let currentIndex = 0;
   let dateHideTimer = null;
+  let searchMatches = [];
+  let activeSearchMatchIndex = -1;
 
   function updateHeader() {
     if (!dp || !chatName) return;
@@ -34,11 +50,17 @@ document.addEventListener("DOMContentLoaded", () => {
       dp.alt = "Mehul";
     }
 
-    // Fallback avatar if local media files are missing.
     dp.onerror = () => {
       const name = chatName.innerText || "?";
       dp.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=202c33&color=ffffff`;
     };
+  }
+
+  function updateWallpaper() {
+    if (!app) return;
+
+    const wallpaper = viewerWallpapers[VIEWER] || "";
+    app.style.backgroundImage = wallpaper ? `url('${wallpaper}')` : "none";
   }
 
   function normalizeAttachmentName(rawMessage) {
@@ -101,7 +123,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function getActiveMessages() {
-    return filteredMessages.length ? filteredMessages : allMessages;
+    return filteredMessages.length || searchInput.value.trim() ? filteredMessages : allMessages;
   }
 
   function resetChat() {
@@ -112,6 +134,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     loadInitialMessages();
     toggleScrollButton();
+    refreshSearchMatches();
   }
 
   function loadInitialMessages() {
@@ -138,6 +161,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     currentIndex = start;
     chatContainer.scrollTop = chatContainer.scrollHeight - prevHeight;
+    refreshSearchMatches();
   }
 
   function renderMessages(messages, prepend = false) {
@@ -258,13 +282,92 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
+  function refreshSearchMatches() {
+    const query = searchInput.value.toLowerCase().trim();
+
+    searchMatches = [...chatContainer.querySelectorAll(".message")].filter(messageDiv =>
+      query && messageDiv.dataset.searchText.includes(query)
+    );
+
+    activeSearchMatchIndex = searchMatches.length ? 0 : -1;
+    highlightSearchMatch();
+  }
+
+  function highlightSearchMatch() {
+    document.querySelectorAll(".message.search-hit").forEach(el => el.classList.remove("search-hit"));
+
+    if (activeSearchMatchIndex < 0 || !searchMatches[activeSearchMatchIndex]) return;
+
+    const hit = searchMatches[activeSearchMatchIndex];
+    hit.classList.add("search-hit");
+    hit.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+
+  function goToSearchResult(direction) {
+    if (!searchMatches.length) return;
+
+    activeSearchMatchIndex = (activeSearchMatchIndex + direction + searchMatches.length) % searchMatches.length;
+    highlightSearchMatch();
+  }
+
+  function applySearchFilter() {
+    const value = searchInput.value.toLowerCase().trim();
+
+    if (!value) {
+      filteredMessages = [];
+      resetChat();
+      return;
+    }
+
+    filteredMessages = allMessages.filter(msg =>
+      `${msg.sender} ${msg.message} ${msg.date} ${msg.time}`.toLowerCase().includes(value)
+    );
+
+    resetChat();
+  }
+
+  function openSearch() {
+    searchBox.classList.remove("hidden");
+    headerMenu.classList.add("hidden");
+    searchInput.focus();
+  }
+
+  function closeSearch() {
+    searchBox.classList.add("hidden");
+    searchInput.value = "";
+    filteredMessages = [];
+    resetChat();
+  }
+
   if (viewerSelect) {
     viewerSelect.addEventListener("change", () => {
       VIEWER = viewerSelect.value;
       updateHeader();
+      updateWallpaper();
       resetChat();
     });
   }
+
+  if (menuBtn && headerMenu) {
+    menuBtn.addEventListener("click", e => {
+      e.stopPropagation();
+      headerMenu.classList.toggle("hidden");
+    });
+
+    document.addEventListener("click", e => {
+      if (!headerMenu.contains(e.target) && e.target !== menuBtn) {
+        headerMenu.classList.add("hidden");
+      }
+    });
+  }
+
+  if (menuSearchBtn) {
+    menuSearchBtn.addEventListener("click", openSearch);
+  }
+
+  searchCloseBtn?.addEventListener("click", closeSearch);
+  searchUpBtn?.addEventListener("click", () => goToSearchResult(-1));
+  searchDownBtn?.addEventListener("click", () => goToSearchResult(1));
 
   chatContainer.addEventListener("scroll", () => {
     if (chatContainer.scrollTop <= 10) loadOlderMessages();
@@ -281,23 +384,12 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   if (searchInput) {
-    searchInput.addEventListener("input", e => {
-      const value = e.target.value.toLowerCase().trim();
-
-      if (!value) {
-        filteredMessages = [];
-        resetChat();
-        return;
-      }
-
-      filteredMessages = allMessages.filter(msg =>
-        `${msg.sender} ${msg.message} ${msg.date} ${msg.time}`.toLowerCase().includes(value)
-      );
-
-      resetChat();
+    searchInput.addEventListener("input", () => {
+      applySearchFilter();
     });
   }
 
   updateHeader();
+  updateWallpaper();
   loadAllChats();
 });
