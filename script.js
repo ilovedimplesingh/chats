@@ -31,6 +31,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const videoExt = [".mp4", ".webm", ".ogg", ".opus"];
   const docExt = [".pdf", ".doc", ".docx", ".ppt", ".pptx", ".xls", ".xlsx", ".zip"];
   const files = ["chat1.txt", "chat2.txt", "chat3.txt", "chat4.txt", "chat5.txt"];
+  const LOCAL_STORAGE_KEY = "chat_local_messages";
 
   const viewerWallpapers = {
     Mehul: "media/mehulchat.jpg",
@@ -44,6 +45,7 @@ document.addEventListener("DOMContentLoaded", () => {
   let activeSearchMatchIndex = -1;
   let isSearchMode = false;
   let firebaseInitialLoadDone = false;
+  const loadedFirebaseDocIds = new Set();
 
   function syncViewerSelect() {
     if (viewerSelect) viewerSelect.value = VIEWER;
@@ -110,6 +112,19 @@ document.addEventListener("DOMContentLoaded", () => {
     return "text";
   }
 
+  function toTimestamp(message) {
+    if (Number.isFinite(Number(message.timestamp))) {
+      return Number(message.timestamp);
+    }
+
+    const inferred = Date.parse(`${message.date} ${message.time || ""}`);
+    return Number.isFinite(inferred) ? inferred : 0;
+  }
+
+  function compareMessagesByTime(a, b) {
+    return toTimestamp(a) - toTimestamp(b);
+  }
+
   function parseChat(data) {
     const lines = data.split("\n");
     const regex = /^(.+?), (.+?) - (.*?): (.*)$/;
@@ -118,14 +133,38 @@ document.addEventListener("DOMContentLoaded", () => {
       .map(line => {
         const match = line.match(regex);
         if (!match) return null;
+        const timestamp = Date.parse(`${match[1]} ${match[2]}`);
         return {
           date: match[1],
           time: match[2],
           sender: match[3],
-          message: match[4].trim()
+          message: match[4].trim(),
+          timestamp: Number.isFinite(timestamp) ? timestamp : undefined
         };
       })
       .filter(Boolean);
+  }
+
+  function loadLocalMessages() {
+    try {
+      const raw = localStorage.getItem(LOCAL_STORAGE_KEY);
+      if (!raw) return [];
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) return [];
+      return parsed.filter(item => item && typeof item.message === "string");
+    } catch (error) {
+      console.warn("Could not load local messages:", error);
+      return [];
+    }
+  }
+
+  function saveLocalMessages() {
+    const localOnly = allMessages.filter(msg => msg.localOnly === true);
+    try {
+      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(localOnly));
+    } catch (error) {
+      console.warn("Could not persist local messages:", error);
+    }
   }
 
   async function loadAllChats() {
@@ -141,10 +180,15 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     }
 
-    if (!combinedData) return;
+    if (combinedData) {
+      combinedData = combinedData.replace(/(\d{2}\/\d{2}\/\d{4}, \d{1,2}:\d{2} - )/g, "\n$1");
+      allMessages = parseChat(combinedData);
+    } else {
+      allMessages = [];
+    }
 
-    combinedData = combinedData.replace(/(\d{2}\/\d{2}\/\d{4}, \d{1,2}:\d{2} - )/g, "\n$1");
-    allMessages = parseChat(combinedData);
+    allMessages.push(...loadLocalMessages());
+    allMessages.sort(compareMessagesByTime);
     resetChat();
   }
 
@@ -392,17 +436,26 @@ document.addEventListener("DOMContentLoaded", () => {
     resetChat();
   }
 
-  function appendFirebaseMessage(data) {
+  function buildMessageFromFirebase(data, docId) {
     const stamp = Number(data.timestamp) || Date.now();
     const when = new Date(stamp);
-    const newMsg = {
+
+    return {
+      id: docId,
       date: when.toLocaleDateString(),
       time: when.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
       sender: data.sender || "Unknown",
-      message: data.message || ""
+      message: data.message || "",
+      timestamp: stamp
     };
+  }
 
+  function appendFirebaseMessage(data, docId) {
+    if (docId && loadedFirebaseDocIds.has(docId)) return;
+
+    const newMsg = buildMessageFromFirebase(data, docId);
     allMessages.push(newMsg);
+    if (docId) loadedFirebaseDocIds.add(docId);
 
     const lastDate = chatContainer.querySelector(".date-separator:last-of-type")?.innerText;
     if (lastDate !== newMsg.date) {
@@ -416,12 +469,32 @@ document.addEventListener("DOMContentLoaded", () => {
     toggleScrollButton();
   }
 
+  function appendLocalOnlyMessage(text) {
+    const timestamp = Date.now();
+    const when = new Date(timestamp);
+    const message = {
+      id: `local-${timestamp}`,
+      date: when.toLocaleDateString(),
+      time: when.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+      sender: VIEWER,
+      message: text,
+      timestamp,
+      localOnly: true
+    };
+
+    allMessages.push(message);
+    allMessages.sort(compareMessagesByTime);
+    saveLocalMessages();
+    resetChat();
+    chatContainer.scrollTop = chatContainer.scrollHeight;
+  }
+
   async function sendMessage(text) {
     const firestore = window.firebaseFirestore;
     const db = window.firebaseDb;
 
     if (!firestore || !db) {
-      console.warn("Firebase not ready. Message not sent.");
+      appendLocalOnlyMessage(text);
       return;
     }
 
@@ -437,7 +510,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const db = window.firebaseDb;
 
     if (!firestore || !db) {
-      console.warn("Firebase unavailable; using local chat files only.");
+      console.warn("Firebase unavailable; using local chat files and localStorage.");
       return;
     }
 
@@ -445,12 +518,22 @@ document.addEventListener("DOMContentLoaded", () => {
 
     firestore.onSnapshot(q, snapshot => {
       if (!firebaseInitialLoadDone) {
+        const firebaseMessages = snapshot.docs.map(doc => {
+          loadedFirebaseDocIds.add(doc.id);
+          return buildMessageFromFirebase(doc.data(), doc.id);
+        });
+
+        allMessages = [...allMessages.filter(msg => !msg.localOnly), ...firebaseMessages];
+        allMessages.sort(compareMessagesByTime);
+        saveLocalMessages();
+        resetChat();
         firebaseInitialLoadDone = true;
+        chatContainer.scrollTop = chatContainer.scrollHeight;
         return;
       }
 
       snapshot.docChanges().forEach(change => {
-        if (change.type === "added") appendFirebaseMessage(change.doc.data());
+        if (change.type === "added") appendFirebaseMessage(change.doc.data(), change.doc.id);
       });
 
       chatContainer.scrollTop = chatContainer.scrollHeight;
