@@ -1,6 +1,3 @@
-import { collection, addDoc, onSnapshot, query, orderBy } 
-from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
-
 document.addEventListener("DOMContentLoaded", () => {
   const app = document.getElementById("app");
   const chatContainer = document.getElementById("chat-container");
@@ -24,6 +21,9 @@ document.addEventListener("DOMContentLoaded", () => {
   const menuSearchBtn = document.getElementById("menu-search");
   const menuSwitchBtn = document.getElementById("menu-switch");
 
+  const input = document.getElementById("msg-input");
+  const sendBtn = document.getElementById("send-btn");
+
   let VIEWER = viewerSelect ? viewerSelect.value : "Mehul";
 
   const CHUNK_SIZE = 200;
@@ -43,10 +43,10 @@ document.addEventListener("DOMContentLoaded", () => {
   let searchMatches = [];
   let activeSearchMatchIndex = -1;
   let isSearchMode = false;
+  let firebaseInitialLoadDone = false;
 
   function syncViewerSelect() {
-    if (!viewerSelect) return;
-    viewerSelect.value = VIEWER;
+    if (viewerSelect) viewerSelect.value = VIEWER;
   }
 
   function updateHeader() {
@@ -70,7 +70,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function updateWallpaper() {
     if (!app) return;
-
     const wallpaper = viewerWallpapers[VIEWER] || "";
     app.style.backgroundImage = wallpaper ? `url('${wallpaper}')` : "none";
     app.style.backgroundPosition = "center center";
@@ -105,7 +104,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function getFileType(message) {
     const cleanMessage = normalizeAttachmentName(message).toLowerCase();
-
     if (imageExt.some(ext => cleanMessage.endsWith(ext))) return "image";
     if (videoExt.some(ext => cleanMessage.endsWith(ext))) return "video";
     if (docExt.some(ext => cleanMessage.endsWith(ext))) return "doc";
@@ -168,7 +166,6 @@ document.addEventListener("DOMContentLoaded", () => {
   function loadInitialMessages() {
     const start = Math.max(0, currentIndex - CHUNK_SIZE);
     const slice = allMessages.slice(start, currentIndex);
-
     renderMessages(slice, false);
 
     currentIndex = start;
@@ -184,7 +181,6 @@ document.addEventListener("DOMContentLoaded", () => {
     const slice = allMessages.slice(start, currentIndex);
 
     renderMessages(slice, true);
-
     currentIndex = start;
     chatContainer.scrollTop = chatContainer.scrollHeight - prevHeight;
     applySearchHighlight();
@@ -270,7 +266,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function toggleScrollButton() {
     if (!scrollBtn) return;
-
     const distanceFromBottom = chatContainer.scrollHeight - chatContainer.scrollTop - chatContainer.clientHeight;
     scrollBtn.style.display = distanceFromBottom > 300 ? "block" : "none";
   }
@@ -328,7 +323,7 @@ document.addEventListener("DOMContentLoaded", () => {
       }
 
       if (raw.toLowerCase().includes(queryLower)) {
-        block.innerHTML = raw.replace(regex, "<mark class=\"search-mark\">$1</mark>");
+        block.innerHTML = raw.replace(regex, '<mark class="search-mark">$1</mark>');
       } else {
         block.textContent = raw;
       }
@@ -397,16 +392,77 @@ document.addEventListener("DOMContentLoaded", () => {
     resetChat();
   }
 
-  if (viewerSelect) {
-    viewerSelect.addEventListener("change", () => {
-      setViewer(viewerSelect.value);
+  function appendFirebaseMessage(data) {
+    const stamp = Number(data.timestamp) || Date.now();
+    const when = new Date(stamp);
+    const newMsg = {
+      date: when.toLocaleDateString(),
+      time: when.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+      sender: data.sender || "Unknown",
+      message: data.message || ""
+    };
+
+    allMessages.push(newMsg);
+
+    const lastDate = chatContainer.querySelector(".date-separator:last-of-type")?.innerText;
+    if (lastDate !== newMsg.date) {
+      const dateDiv = document.createElement("div");
+      dateDiv.className = "date-separator";
+      dateDiv.innerText = newMsg.date;
+      chatContainer.appendChild(dateDiv);
+    }
+
+    createMessage(newMsg.sender, newMsg.message, newMsg.time, false, newMsg.date);
+    toggleScrollButton();
+  }
+
+  async function sendMessage(text) {
+    const firestore = window.firebaseFirestore;
+    const db = window.firebaseDb;
+
+    if (!firestore || !db) {
+      console.warn("Firebase not ready. Message not sent.");
+      return;
+    }
+
+    await firestore.addDoc(firestore.collection(db, "messages"), {
+      sender: VIEWER,
+      message: text,
+      timestamp: Date.now()
     });
   }
 
-  viewerOptionButtons.forEach(button => {
-    button.addEventListener("click", () => {
-      setViewer(button.dataset.viewer);
+  function wireFirebase() {
+    const firestore = window.firebaseFirestore;
+    const db = window.firebaseDb;
+
+    if (!firestore || !db) {
+      console.warn("Firebase unavailable; using local chat files only.");
+      return;
+    }
+
+    const q = firestore.query(firestore.collection(db, "messages"), firestore.orderBy("timestamp"));
+
+    firestore.onSnapshot(q, snapshot => {
+      if (!firebaseInitialLoadDone) {
+        firebaseInitialLoadDone = true;
+        return;
+      }
+
+      snapshot.docChanges().forEach(change => {
+        if (change.type === "added") appendFirebaseMessage(change.doc.data());
+      });
+
+      chatContainer.scrollTop = chatContainer.scrollHeight;
     });
+  }
+
+  if (viewerSelect) {
+    viewerSelect.addEventListener("change", () => setViewer(viewerSelect.value));
+  }
+
+  viewerOptionButtons.forEach(button => {
+    button.addEventListener("click", () => setViewer(button.dataset.viewer));
   });
 
   if (menuBtn && headerMenu) {
@@ -445,73 +501,25 @@ document.addEventListener("DOMContentLoaded", () => {
 
   searchInput?.addEventListener("input", applySearchFilter);
 
+  sendBtn?.addEventListener("click", async () => {
+    const text = input?.value.trim();
+    if (!text) return;
+    await sendMessage(text);
+    input.value = "";
+  });
+
+  input?.addEventListener("keydown", async event => {
+    if (event.key !== "Enter") return;
+    event.preventDefault();
+    const text = input.value.trim();
+    if (!text) return;
+    await sendMessage(text);
+    input.value = "";
+  });
+
   updateHeader();
   updateWallpaper();
   openViewerPicker();
   loadAllChats();
-});
-
-const input = document.getElementById("msg-input");
-const btn = document.getElementById("send-btn");
-
-btn.onclick = () => {
-  if (!input.value.trim()) return;
-
-  sendMessage(input.value);
-  input.value = "";
-};
-
-import { addDoc } 
-from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
-
-async function sendMessage(text) {
-  await addDoc(collection(db, "messages"), {
-    sender: VIEWER,
-    message: text,
-    timestamp: Date.now()
-  });
-}
-
-
-
-// 🔥 FIREBASE REAL-TIME LISTENER
-import { collection, onSnapshot, query, orderBy } 
-from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
-
-const q = query(collection(db, "messages"), orderBy("timestamp"));
-
-let firebaseLoaded = false;
-
-onSnapshot(q, (snapshot) => {
-  if (!firebaseLoaded) {
-    firebaseLoaded = true;
-    return; // skip first load (prevents duplicates)
-  }
-
-  snapshot.docChanges().forEach(change => {
-    if (change.type === "added") {
-      const msg = change.doc.data();
-
-      const newMsg = {
-        date: new Date(msg.timestamp).toLocaleDateString(),
-        time: new Date(msg.timestamp).toLocaleTimeString().slice(0,5),
-        sender: msg.sender,
-        message: msg.message
-      };
-
-      allMessages.push(newMsg);
-
-      createMessage(
-        newMsg.sender,
-        newMsg.message,
-        newMsg.time,
-        false
-      );
-    }
-  });
-
-  chatContainer.scrollTop = chatContainer.scrollHeight;
-});
-
-  chatContainer.scrollTop = chatContainer.scrollHeight;
+  wireFirebase();
 });
