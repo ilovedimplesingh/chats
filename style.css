@@ -1,38 +1,94 @@
 /* 🔥 BASE */
+html,
 body {
   margin: 0;
+  width: 100%;
+  height: 100%;
   font-family: "Segoe UI", Arial, sans-serif;
   background-color: #111b21;
 }
 
 .app {
-  max-width: 500px;
-  margin: auto;
-  height: 100vh;
+  width: 100vw;
+  height: 100dvh;
   display: flex;
   flex-direction: column;
-  background: url("https://i.ibb.co/7QpKsCX/whatsapp-bg.png");
   background-size: cover;
+  background-position: center center;
+  background-repeat: no-repeat;
+  background-color: #000;
 }
 
 /* 🔝 HEADER */
 .header {
   display: flex;
   align-items: center;
-  padding: 10px;
+  padding: 12px;
   background: #202c33;
   color: white;
   gap: 10px;
   border-bottom: 1px solid #2a3942;
+  position: relative;
+}
+
+#chat-name {
+  font-weight: 700;
+  font-size: clamp(19px, 2.2vw, 24px);
+}
+
+.header-actions {
+  margin-left: auto;
+  position: relative;
+}
+
+.icon-btn {
+  border: none;
+  background: transparent;
+  color: white;
+  cursor: pointer;
+  font-size: 20px;
+  padding: 6px 10px;
+}
+
+.header-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 150px;
+  background: #233138;
+  border: 1px solid #2a3942;
+  border-radius: 10px;
+  overflow: hidden;
+  z-index: 1001;
+}
+
+.header-menu button {
+  width: 100%;
+  border: none;
+  background: transparent;
+  color: white;
+  text-align: left;
+  padding: 11px 12px;
+  cursor: pointer;
+  font-size: 15px;
+}
+
+.header-menu button:hover {
+  background: #2b3c46;
+}
+
+.hidden {
+  display: none !important;
 }
 
 .dp {
-  width: 40px;
-  height: 40px;
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
+  flex-shrink: 0;
 }
 
-/* 👤 VIEWER SELECT */
+/* 👤 VIEWER SELECT (hidden; managed via modal/menu) */
 .viewer-select {
   padding: 8px;
   background: #111b21;
@@ -50,20 +106,34 @@ select {
 .search-box {
   padding: 8px;
   background: #111b21;
+  display: flex;
+  gap: 8px;
+  align-items: center;
 }
 
 #search {
-  width: 100%;
-  padding: 8px;
+  flex: 1;
+  padding: 11px 12px;
   border-radius: 20px;
   border: none;
   outline: none;
+  font-size: 16px; /* keep >=16px so Android doesn't auto-zoom */
+}
+
+.search-nav {
+  display: flex;
+  gap: 4px;
+}
+
+.search-hit {
+  outline: 2px solid #25d366;
+  outline-offset: 2px;
 }
 
 /* 💬 CHAT CONTAINER */
 #chat-container {
   flex: 1;
-  padding: 10px;
+  padding: 12px;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
@@ -72,18 +142,19 @@ select {
 
 /* 🟢 MESSAGES */
 .message {
-  max-width: 75%;
-  padding: 8px 12px;
-  margin: 4px 0;
-  border-radius: 10px;
-  font-size: 14px;
+  max-width: min(78%, 720px);
+  padding: 11px 14px;
+  margin: 6px 0;
+  border-radius: 12px;
+  font-size: clamp(16px, 1.35vw, 18px);
+  line-height: 1.35;
   position: relative;
   word-wrap: break-word;
 }
 
 /* RIGHT (ME) */
 .me {
-  background: #005c4b;
+  background: #005c4bcc;
   align-self: flex-end;
   color: white;
   border-top-right-radius: 0;
@@ -91,7 +162,7 @@ select {
 
 /* LEFT (OTHER) */
 .other {
-  background: #202c33;
+  background: #202c33cc;
   align-self: flex-start;
   color: white;
   border-top-left-radius: 0;
@@ -99,9 +170,9 @@ select {
 
 /* ⏰ TIME */
 .time {
-  font-size: 10px;
-  opacity: 0.7;
-  margin-top: 4px;
+  font-size: 12px;
+  opacity: 0.75;
+  margin-top: 5px;
   text-align: right;
 }
 
@@ -130,7 +201,7 @@ video {
 .date-separator {
   text-align: center;
   margin: 10px 0;
-  font-size: 12px;
+  font-size: 13px;
   background: #182229;
   color: #ccc;
   padding: 5px 12px;
@@ -142,14 +213,14 @@ video {
 /* 📌 FLOATING DATE */
 #floating-date {
   position: fixed;
-  top: 80px;
+  top: 84px;
   left: 50%;
   transform: translateX(-50%);
   background: #182229;
   color: white;
-  padding: 5px 12px;
+  padding: 6px 12px;
   border-radius: 10px;
-  font-size: 12px;
+  font-size: 13px;
   display: none;
   z-index: 1000;
 }
@@ -166,7 +237,60 @@ video {
   background: #202c33;
   color: white;
   cursor: pointer;
+  font-size: 20px;
+}
+
+/* 🧭 VIEWER PICKER */
+.viewer-picker {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 2100;
+  padding: 20px;
+}
+
+.viewer-card {
+  width: min(92vw, 420px);
+  background: #202c33;
+  color: white;
+  border-radius: 14px;
+  padding: 18px;
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.35);
+}
+
+.viewer-card h3 {
+  margin: 0 0 8px;
+  font-size: 22px;
+}
+
+.viewer-card p {
+  margin: 0 0 14px;
+  font-size: 14px;
+  color: #cdd6db;
+}
+
+.viewer-options {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.viewer-option {
+  border: 1px solid #3c4e57;
+  background: #2a3942;
+  color: #fff;
+  padding: 12px;
+  border-radius: 10px;
   font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.viewer-option:hover {
+  background: #324651;
 }
 
 /* 🖼 FULLSCREEN IMAGE OVERLAY */
@@ -176,7 +300,7 @@ video {
   left: 0;
   width: 100%;
   height: 100%;
-  background: black;
+  background: #000;
   display: flex;
   justify-content: center;
   align-items: center;
@@ -188,7 +312,7 @@ video {
   max-height: 90%;
 }
 
-/* 🔥 SCROLLBAR (OPTIONAL NICE TOUCH) */
+/* 🔥 SCROLLBAR */
 #chat-container::-webkit-scrollbar {
   width: 6px;
 }
@@ -196,4 +320,16 @@ video {
 #chat-container::-webkit-scrollbar-thumb {
   background: #2a3942;
   border-radius: 10px;
+}
+
+@media (min-width: 1024px) {
+  .message {
+    max-width: min(64%, 760px);
+    font-size: 18px;
+    padding: 12px 15px;
+  }
+
+  .time {
+    font-size: 12.5px;
+  }
 }

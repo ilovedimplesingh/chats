@@ -2,35 +2,59 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>chats</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-<div class="app">
+<div class="app" id="app">
 
-  <!-- 🔝 HEADER -->
-<div class="header">
-  <img id="dp" class="dp" src="">
-  <span id="chat-name"></span>
-</div>
+  <div class="header">
+    <img id="dp" class="dp" src="" alt="">
+    <span id="chat-name"></span>
 
-<div class="viewer-select">
-  <select id="viewer">
-    <option value="Mehul">Mehul</option>
-    <option value="Dimp">Dimp</option>
-  </select>
-</div>
+    <div class="header-actions">
+      <button id="menu-btn" class="icon-btn" aria-label="More options">⋮</button>
+      <div id="header-menu" class="header-menu hidden">
+        <button id="menu-search" type="button">Search</button>
+        <button id="menu-switch" type="button">Switch chat</button>
+      </div>
+    </div>
+  </div>
 
-<div class="search-box">
-  <input type="text" id="search" placeholder="Search...">
-</div>
+  <div class="viewer-select hidden" aria-hidden="true">
+    <select id="viewer">
+      <option value="Mehul">Mehul</option>
+      <option value="Dimp">Dimple</option>
+    </select>
+  </div>
 
-<div id="floating-date"></div>
+  <div class="search-box hidden" id="search-box">
+    <input type="text" id="search" placeholder="Search...">
+    <div class="search-nav">
+      <button id="search-up" class="icon-btn" aria-label="Previous result">⬆️</button>
+      <button id="search-down" class="icon-btn" aria-label="Next result">⬇️</button>
+      <button id="search-close" class="icon-btn" aria-label="Close search">✕</button>
+    </div>
+  </div>
 
-<div id="chat-container"></div>
+  <div id="floating-date"></div>
 
-<button id="scroll-bottom">⬇️</button>
+  <div id="chat-container"></div>
+
+  <button id="scroll-bottom">⬇️</button>
+
+  <div id="viewer-picker" class="viewer-picker hidden" role="dialog" aria-modal="true" aria-label="Choose chat">
+    <div class="viewer-card">
+      <h3>Select chat</h3>
+      <p>Choose which side you want to view as.</p>
+      <div class="viewer-options">
+        <button type="button" class="viewer-option" data-viewer="Mehul">Mehul</button>
+        <button type="button" class="viewer-option" data-viewer="Dimp">Dimple</button>
+      </div>
+    </div>
+  </div>
 
 </div>
 
