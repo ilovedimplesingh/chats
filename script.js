@@ -35,11 +35,11 @@ document.addEventListener("DOMContentLoaded", () => {
   };
 
   let allMessages = [];
-  let filteredMessages = [];
   let currentIndex = 0;
   let dateHideTimer = null;
   let searchMatches = [];
   let activeSearchMatchIndex = -1;
+  let isSearchMode = false;
 
   function syncViewerSelect() {
     if (!viewerSelect) return;
@@ -72,8 +72,6 @@ document.addEventListener("DOMContentLoaded", () => {
     app.style.backgroundImage = wallpaper ? `url('${wallpaper}')` : "none";
     app.style.backgroundPosition = "center center";
     app.style.backgroundRepeat = "no-repeat";
-
-    // Mehul wallpaper is square: keep full image visible in center without cropping.
     app.style.backgroundSize = VIEWER === "Mehul" ? "contain" : "cover";
   }
 
@@ -97,10 +95,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function normalizeAttachmentName(rawMessage) {
     let cleaned = rawMessage.trim();
-
     cleaned = cleaned.replace(/\s*\(file attached\)\s*$/i, "");
     cleaned = cleaned.replace(/^<attached:\s*/i, "").replace(/>$/, "");
-
     return cleaned.trim();
   }
 
@@ -121,7 +117,6 @@ document.addEventListener("DOMContentLoaded", () => {
       .map(line => {
         const match = line.match(regex);
         if (!match) return null;
-
         return {
           date: match[1],
           time: match[2],
@@ -152,25 +147,24 @@ document.addEventListener("DOMContentLoaded", () => {
     resetChat();
   }
 
-  function getActiveMessages() {
-    return filteredMessages.length || searchInput.value.trim() ? filteredMessages : allMessages;
-  }
-
   function resetChat() {
     chatContainer.innerHTML = "";
 
-    const activeMessages = getActiveMessages();
-    currentIndex = activeMessages.length;
+    if (isSearchMode) {
+      renderMessages(allMessages, false);
+      currentIndex = 0;
+    } else {
+      currentIndex = allMessages.length;
+      loadInitialMessages();
+    }
 
-    loadInitialMessages();
     toggleScrollButton();
-    refreshSearchMatches();
+    applySearchHighlight();
   }
 
   function loadInitialMessages() {
-    const activeMessages = getActiveMessages();
     const start = Math.max(0, currentIndex - CHUNK_SIZE);
-    const slice = activeMessages.slice(start, currentIndex);
+    const slice = allMessages.slice(start, currentIndex);
 
     renderMessages(slice, false);
 
@@ -180,18 +174,17 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function loadOlderMessages() {
-    if (currentIndex <= 0 || filteredMessages.length) return;
+    if (currentIndex <= 0 || isSearchMode) return;
 
     const prevHeight = chatContainer.scrollHeight;
-    const activeMessages = getActiveMessages();
     const start = Math.max(0, currentIndex - CHUNK_SIZE);
-    const slice = activeMessages.slice(start, currentIndex);
+    const slice = allMessages.slice(start, currentIndex);
 
     renderMessages(slice, true);
 
     currentIndex = start;
     chatContainer.scrollTop = chatContainer.scrollHeight - prevHeight;
-    refreshSearchMatches();
+    applySearchHighlight();
   }
 
   function renderMessages(messages, prepend = false) {
@@ -256,7 +249,11 @@ document.addEventListener("DOMContentLoaded", () => {
       link.target = "_blank";
       msgDiv.appendChild(link);
     } else {
-      msgDiv.textContent = rawMessage;
+      const textDiv = document.createElement("div");
+      textDiv.className = "message-text";
+      textDiv.dataset.raw = rawMessage;
+      textDiv.textContent = rawMessage;
+      msgDiv.appendChild(textDiv);
     }
 
     const timeDiv = document.createElement("div");
@@ -308,11 +305,34 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  function refreshSearchMatches() {
-    const query = searchInput.value.toLowerCase().trim();
+  function escapeRegex(text) {
+    return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  }
+
+  function applySearchHighlight() {
+    const query = searchInput.value.trim();
+    const queryLower = query.toLowerCase();
+    const regex = query ? new RegExp(`(${escapeRegex(query)})`, "gi") : null;
+
+    document.querySelectorAll(".message.search-hit").forEach(el => el.classList.remove("search-hit"));
+
+    const textBlocks = [...chatContainer.querySelectorAll(".message-text")];
+    textBlocks.forEach(block => {
+      const raw = block.dataset.raw || block.textContent || "";
+      if (!regex) {
+        block.textContent = raw;
+        return;
+      }
+
+      if (raw.toLowerCase().includes(queryLower)) {
+        block.innerHTML = raw.replace(regex, "<mark class=\"search-mark\">$1</mark>");
+      } else {
+        block.textContent = raw;
+      }
+    });
 
     searchMatches = [...chatContainer.querySelectorAll(".message")].filter(messageDiv =>
-      query && messageDiv.dataset.searchText.includes(query)
+      query && messageDiv.dataset.searchText.includes(queryLower)
     );
 
     activeSearchMatchIndex = searchMatches.length ? 0 : -1;
@@ -332,7 +352,6 @@ document.addEventListener("DOMContentLoaded", () => {
   function goToSearchResult(direction) {
     if (!searchMatches.length) return;
 
-    // Up should go to older (towards top), down should go to newer (towards bottom).
     const nextIndex = activeSearchMatchIndex + direction;
     if (nextIndex < 0 || nextIndex >= searchMatches.length) return;
 
@@ -341,31 +360,37 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function applySearchFilter() {
-    const value = searchInput.value.toLowerCase().trim();
+    const value = searchInput.value.trim();
 
     if (!value) {
-      filteredMessages = [];
+      isSearchMode = false;
       resetChat();
       return;
     }
 
-    filteredMessages = allMessages.filter(msg =>
-      `${msg.sender} ${msg.message} ${msg.date} ${msg.time}`.toLowerCase().includes(value)
-    );
+    if (!isSearchMode) {
+      isSearchMode = true;
+      resetChat();
+      return;
+    }
 
-    resetChat();
+    applySearchHighlight();
   }
 
   function openSearch() {
     searchBox.classList.remove("hidden");
     headerMenu.classList.add("hidden");
     searchInput.focus();
+    if (searchInput.value.trim()) {
+      isSearchMode = true;
+      resetChat();
+    }
   }
 
   function closeSearch() {
     searchBox.classList.add("hidden");
     searchInput.value = "";
-    filteredMessages = [];
+    isSearchMode = false;
     resetChat();
   }
 

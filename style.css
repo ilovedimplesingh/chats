@@ -46,8 +46,12 @@ body {
   background: transparent;
   color: white;
   cursor: pointer;
-  font-size: 20px;
-  padding: 6px 10px;
+  font-size: 18px;
+  line-height: 1;
+  min-width: 34px;
+  min-height: 34px;
+  border-radius: 17px;
+  padding: 7px;
 }
 
 .header-menu {
@@ -128,6 +132,17 @@ select {
 .search-hit {
   outline: 2px solid #25d366;
   outline-offset: 2px;
+}
+
+.search-mark {
+  background: #ffeb3b;
+  color: #111;
+  border-radius: 4px;
+  padding: 0 2px;
+}
+
+.message-text {
+  white-space: pre-wrap;
 }
 
 /* 💬 CHAT CONTAINER */
@@ -237,7 +252,8 @@ video {
   background: #202c33;
   color: white;
   cursor: pointer;
-  font-size: 20px;
+  font-size: 22px;
+  line-height: 1;
 }
 
 /* 🧭 VIEWER PICKER */
