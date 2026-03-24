@@ -33,7 +33,7 @@ body {
 
 #chat-name {
   font-weight: 600;
-  font-size: 18px;
+  font-size: 25px;
 }
 
 .header-actions {
@@ -81,8 +81,8 @@ body {
 }
 
 .dp {
-  width: 40px;
-  height: 40px;
+  width: 50px;
+  height: 50px;
   border-radius: 50%;
 }
 
@@ -154,7 +154,7 @@ select {
   padding: 10px 14px;
   margin: 5px 0;
   border-radius: 10px;
-  font-size: 16px;
+  font-size: 30px;
   position: relative;
   word-wrap: break-word;
 }
@@ -177,7 +177,7 @@ select {
 
 /* ⏰ TIME */
 .time {
-  font-size: 11px;
+  font-size: 20px;
   opacity: 0.7;
   margin-top: 4px;
   text-align: right;
