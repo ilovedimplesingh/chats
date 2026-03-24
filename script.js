@@ -31,6 +31,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const videoExt = [".mp4", ".webm", ".ogg", ".opus"];
   const docExt = [".pdf", ".doc", ".docx", ".ppt", ".pptx", ".xls", ".xlsx", ".zip"];
   const files = ["chat1.txt", "chat2.txt", "chat3.txt", "chat4.txt", "chat5.txt"];
+  const LOCAL_STORAGE_KEY = "chat_local_messages";
 
   const viewerWallpapers = {
     Mehul: "media/mehulchat.jpg",
@@ -142,6 +143,28 @@ document.addEventListener("DOMContentLoaded", () => {
         };
       })
       .filter(Boolean);
+  }
+
+  function loadLocalMessages() {
+    try {
+      const raw = localStorage.getItem(LOCAL_STORAGE_KEY);
+      if (!raw) return [];
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) return [];
+      return parsed.filter(item => item && typeof item.message === "string");
+    } catch (error) {
+      console.warn("Could not load local messages:", error);
+      return [];
+    }
+  }
+
+  function saveLocalMessages() {
+    const localOnly = allMessages.filter(msg => msg.localOnly === true);
+    try {
+      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(localOnly));
+    } catch (error) {
+      console.warn("Could not persist local messages:", error);
+    }
   }
 
   async function loadAllChats() {
