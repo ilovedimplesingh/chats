@@ -9,6 +9,7 @@ body {
 }
 
 .app {
+  position: relative;
   width: 100vw;
   height: 100dvh;
   display: flex;
@@ -309,6 +310,122 @@ video {
   background: #324651;
 }
 
+/* 🖼️ MEDIA SHEET */
+.media-panel {
+  position: fixed;
+  inset: 0;
+  background: rgba(11, 20, 26, 0.86);
+  z-index: 2200;
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+}
+
+.media-sheet {
+  width: min(100%, 620px);
+  height: min(85dvh, 760px);
+  background: #111b21;
+  border-top-left-radius: 18px;
+  border-top-right-radius: 18px;
+  border: 1px solid #2a3942;
+  border-bottom: none;
+  display: flex;
+  flex-direction: column;
+}
+
+.media-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  border-bottom: 1px solid #2a3942;
+}
+
+.media-head h3 {
+  margin: 0;
+  color: #e9edef;
+  font-size: 20px;
+}
+
+.media-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 10px 14px;
+  border-bottom: 1px solid #2a3942;
+}
+
+.media-tab {
+  border: 1px solid #3c4e57;
+  background: #202c33;
+  color: #d9e0e4;
+  border-radius: 999px;
+  padding: 8px 14px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.media-tab.active {
+  border-color: #25d366;
+  background: #103529;
+  color: #88f4b4;
+}
+
+.media-list {
+  flex: 1;
+  overflow-y: auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 10px;
+  padding: 12px 14px calc(12px + env(safe-area-inset-bottom));
+}
+
+.media-item {
+  border: 1px solid #2a3942;
+  border-radius: 12px;
+  background: #182229;
+  color: #dce5ea;
+  text-align: left;
+  overflow: hidden;
+  cursor: pointer;
+  padding: 0;
+}
+
+.media-preview {
+  aspect-ratio: 1 / 1;
+  background: #0d1418;
+}
+
+.media-preview img,
+.media-preview video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.media-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 8px 10px 10px;
+  font-size: 12px;
+}
+
+.media-meta strong {
+  color: #f2f6f8;
+  font-size: 12px;
+}
+
+.media-empty {
+  color: #9fb0ba;
+  font-size: 14px;
+  text-align: center;
+  padding: 20px;
+  grid-column: 1 / -1;
+}
+
 /* 🖼 FULLSCREEN IMAGE OVERLAY */
 .overlay {
   position: fixed;
@@ -352,6 +469,7 @@ video {
 
 /* ✍️ WHATSAPP-LIKE COMPOSER */
 .input-box {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -405,4 +523,36 @@ video {
 
 #send-btn:active {
   transform: scale(0.97);
+}
+
+#send-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.attach-menu {
+  position: absolute;
+  bottom: calc(66px + env(safe-area-inset-bottom));
+  left: 12px;
+  background: #233138;
+  border: 1px solid #2a3942;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  min-width: 210px;
+  overflow: hidden;
+  z-index: 2300;
+}
+
+.attach-menu button {
+  border: none;
+  background: transparent;
+  color: #e9edef;
+  text-align: left;
+  padding: 11px 12px;
+  cursor: pointer;
+}
+
+.attach-menu button:hover {
+  background: #2b3c46;
 }

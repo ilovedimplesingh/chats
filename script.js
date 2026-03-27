@@ -1,4 +1,4 @@
-document.addEventListener("DOMContentLoaded", () => {
+function initChatApp() {
   const app = document.getElementById("app");
   const chatContainer = document.getElementById("chat-container");
   const viewerSelect = document.getElementById("viewer");
@@ -19,7 +19,20 @@ document.addEventListener("DOMContentLoaded", () => {
   const menuBtn = document.getElementById("menu-btn");
   const headerMenu = document.getElementById("header-menu");
   const menuSearchBtn = document.getElementById("menu-search");
+  const menuMediaBtn = document.getElementById("menu-media");
   const menuSwitchBtn = document.getElementById("menu-switch");
+  const mediaPanel = document.getElementById("media-panel");
+  const mediaCloseBtn = document.getElementById("media-close");
+  const mediaList = document.getElementById("media-list");
+  const mediaTabs = [...document.querySelectorAll(".media-tab")];
+  const stickerPanel = document.getElementById("sticker-panel");
+  const stickerCloseBtn = document.getElementById("sticker-close");
+  const stickerList = document.getElementById("sticker-list");
+  const attachBtn = document.getElementById("attach-btn");
+  const attachMenu = document.getElementById("attach-menu");
+  const attachStickerBtn = document.getElementById("attach-sticker");
+  const attachFileBtn = document.getElementById("attach-file");
+  const stickerFileInput = document.getElementById("sticker-file-input");
 
   const input = document.getElementById("msg-input");
   const sendBtn = document.getElementById("send-btn");
@@ -27,6 +40,8 @@ document.addEventListener("DOMContentLoaded", () => {
   let VIEWER = viewerSelect ? viewerSelect.value : "Mehul";
 
   const CHUNK_SIZE = 200;
+  const SEARCH_DEBOUNCE_MS = 120;
+  const SEARCH_RESULT_LIMIT = 1500;
   const imageExt = [".jpg", ".jpeg", ".png", ".webp"];
   const videoExt = [".mp4", ".webm", ".ogg", ".opus"];
   const docExt = [".pdf", ".doc", ".docx", ".ppt", ".pptx", ".xls", ".xlsx", ".zip"];
@@ -46,6 +61,8 @@ document.addEventListener("DOMContentLoaded", () => {
   let isSearchMode = false;
   let firebaseInitialLoadDone = false;
   const loadedFirebaseDocIds = new Set();
+  let activeMediaType = "image";
+  let searchDebounceTimer = null;
 
   function syncViewerSelect() {
     if (viewerSelect) viewerSelect.value = VIEWER;
@@ -98,14 +115,17 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function normalizeAttachmentName(rawMessage) {
-    let cleaned = rawMessage.trim();
+    let cleaned = String(rawMessage ?? "").trim();
     cleaned = cleaned.replace(/\s*\(file attached\)\s*$/i, "");
     cleaned = cleaned.replace(/^<attached:\s*/i, "").replace(/>$/, "");
     return cleaned.trim();
   }
 
   function getFileType(message) {
-    const cleanMessage = normalizeAttachmentName(message).toLowerCase();
+    const normalized = normalizeAttachmentName(message);
+    if (/^STK.*\.webp$/i.test(normalized)) return "sticker";
+
+    const cleanMessage = normalized.toLowerCase();
     if (imageExt.some(ext => cleanMessage.endsWith(ext))) return "image";
     if (videoExt.some(ext => cleanMessage.endsWith(ext))) return "video";
     if (docExt.some(ext => cleanMessage.endsWith(ext))) return "doc";
@@ -117,12 +137,39 @@ document.addEventListener("DOMContentLoaded", () => {
       return Number(message.timestamp);
     }
 
-    const inferred = Date.parse(`${message.date} ${message.time || ""}`);
+    const inferred = parseWhatsAppTimestamp(message.date, message.time || "");
     return Number.isFinite(inferred) ? inferred : 0;
   }
 
   function compareMessagesByTime(a, b) {
     return toTimestamp(a) - toTimestamp(b);
+  }
+
+  function parseWhatsAppTimestamp(rawDate, rawTime = "") {
+    const dateMatch = String(rawDate || "").trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+    if (!dateMatch) return NaN;
+
+    let [, dayStr, monthStr, yearStr] = dateMatch;
+    let year = Number(yearStr);
+    if (yearStr.length === 2) year += year >= 70 ? 1900 : 2000;
+
+    const day = Number(dayStr);
+    const monthIndex = Number(monthStr) - 1;
+
+    const timeText = String(rawTime || "").trim().toLowerCase();
+    const timeMatch = timeText.match(/^(\d{1,2}):(\d{2})(?:\s*(am|pm))?$/);
+
+    let hours = 0;
+    let minutes = 0;
+    if (timeMatch) {
+      hours = Number(timeMatch[1]);
+      minutes = Number(timeMatch[2]);
+      const meridiem = timeMatch[3];
+      if (meridiem === "pm" && hours < 12) hours += 12;
+      if (meridiem === "am" && hours === 12) hours = 0;
+    }
+
+    return new Date(year, monthIndex, day, hours, minutes, 0, 0).getTime();
   }
 
   function parseChat(data) {
@@ -133,7 +180,7 @@ document.addEventListener("DOMContentLoaded", () => {
       .map(line => {
         const match = line.match(regex);
         if (!match) return null;
-        const timestamp = Date.parse(`${match[1]} ${match[2]}`);
+        const timestamp = parseWhatsAppTimestamp(match[1], match[2]);
         return {
           date: match[1],
           time: match[2],
@@ -204,6 +251,164 @@ document.addEventListener("DOMContentLoaded", () => {
 
     toggleScrollButton();
     applySearchHighlight();
+    if (mediaPanel && !mediaPanel.classList.contains("hidden")) renderMediaList();
+  }
+
+  function getSearchFilteredMessages(query) {
+    const queryLower = query.toLowerCase();
+    const matches = [];
+
+    for (const msg of allMessages) {
+      if (`${msg.sender} ${msg.message} ${msg.time} ${msg.date}`.toLowerCase().includes(queryLower)) {
+        matches.push(msg);
+        if (matches.length >= SEARCH_RESULT_LIMIT) break;
+      }
+    }
+
+    return matches;
+  }
+
+  function getMediaMessages(type) {
+    return allMessages
+      .filter(msg => getFileType(msg.message) === type)
+      .sort((a, b) => toTimestamp(b) - toTimestamp(a));
+  }
+
+  function setActiveMediaTab(type) {
+    activeMediaType = type;
+    mediaTabs.forEach(tab => {
+      tab.classList.toggle("active", tab.dataset.type === type);
+    });
+  }
+
+  function openMediaPanel() {
+    headerMenu?.classList.add("hidden");
+    mediaPanel?.classList.remove("hidden");
+    setActiveMediaTab(activeMediaType);
+    renderMediaList();
+  }
+
+  function closeMediaPanel() {
+    mediaPanel?.classList.add("hidden");
+  }
+
+  function renderMediaList() {
+    if (!mediaList) return;
+
+    const mediaMessages = getMediaMessages(activeMediaType);
+    mediaList.innerHTML = "";
+
+    if (!mediaMessages.length) {
+      const emptyState = document.createElement("p");
+      emptyState.className = "media-empty";
+      const label = activeMediaType === "image" ? "photos" : activeMediaType === "video" ? "videos" : "stickers";
+      emptyState.textContent = `No ${label} in chat yet.`;
+      mediaList.appendChild(emptyState);
+      return;
+    }
+
+    mediaMessages.forEach(msg => {
+      const filename = normalizeAttachmentName(msg.message);
+      const path = `media/${filename}`;
+
+      const card = document.createElement("button");
+      card.type = "button";
+      card.className = "media-item";
+
+      const previewWrap = document.createElement("div");
+      previewWrap.className = "media-preview";
+
+      if (activeMediaType === "image" || activeMediaType === "sticker") {
+        const img = document.createElement("img");
+        img.src = path;
+        img.alt = filename;
+        previewWrap.appendChild(img);
+      } else {
+        const video = document.createElement("video");
+        video.src = path;
+        video.muted = true;
+        video.playsInline = true;
+        previewWrap.appendChild(video);
+      }
+
+      const meta = document.createElement("div");
+      meta.className = "media-meta";
+      meta.innerHTML = `<strong>${msg.date}</strong><span>${msg.time}</span>`;
+
+      card.appendChild(previewWrap);
+      card.appendChild(meta);
+      card.addEventListener("click", () => {
+        closeMediaPanel();
+        const target = [...chatContainer.querySelectorAll(".message")].find(el =>
+          el.dataset.searchText?.includes(`${msg.sender} ${msg.message} ${msg.time} ${msg.date}`.toLowerCase())
+        );
+        target?.scrollIntoView({ behavior: "smooth", block: "center" });
+      });
+      mediaList.appendChild(card);
+    });
+  }
+
+  function getStickerNames() {
+    const stickers = new Set();
+    allMessages.forEach(msg => {
+      const name = normalizeAttachmentName(msg.message);
+      if (/^STK.*\.webp$/i.test(name)) stickers.add(name);
+    });
+    return [...stickers].sort((a, b) => b.localeCompare(a));
+  }
+
+  function openStickerPanel() {
+    attachMenu?.classList.add("hidden");
+    renderStickerPicker();
+    stickerPanel?.classList.remove("hidden");
+  }
+
+  function closeStickerPanel() {
+    stickerPanel?.classList.add("hidden");
+  }
+
+  function renderStickerPicker() {
+    if (!stickerList) return;
+    stickerList.innerHTML = "";
+
+    const stickers = getStickerNames();
+    if (!stickers.length) {
+      const emptyState = document.createElement("p");
+      emptyState.className = "media-empty";
+      emptyState.textContent = "No STK*.webp stickers found in chat.";
+      stickerList.appendChild(emptyState);
+      return;
+    }
+
+    stickers.forEach(name => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "media-item";
+      button.innerHTML = `<div class="media-preview"><img src="media/${name}" alt="${name}"></div><div class="media-meta"><strong>${name}</strong></div>`;
+      button.addEventListener("click", async () => {
+        closeStickerPanel();
+        await submitOutgoingMessage(`${name} (file attached)`);
+      });
+      stickerList.appendChild(button);
+    });
+  }
+
+  async function submitOutgoingMessage(text) {
+    const trimmed = String(text || "").trim();
+    if (!trimmed) return;
+
+    if (input) input.value = "";
+    if (sendBtn) sendBtn.disabled = true;
+
+    try {
+      await sendMessage(trimmed);
+    } catch (error) {
+      if (input) input.value = trimmed;
+      console.error(error);
+      alert("Could not send message to Firebase. Please check your Firebase rules/connection.");
+    } finally {
+      if (sendBtn) sendBtn.disabled = false;
+    }
   }
 
   function loadInitialMessages() {
@@ -402,33 +607,36 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function applySearchFilter() {
     const value = searchInput.value.trim();
+    const runSearch = () => {
+      if (!value) {
+        isSearchMode = false;
+        resetChat();
+        return;
+      }
 
-    if (!value) {
-      isSearchMode = false;
-      resetChat();
-      return;
-    }
-
-    if (!isSearchMode) {
+      const matches = getSearchFilteredMessages(value);
       isSearchMode = true;
-      resetChat();
-      return;
-    }
+      chatContainer.innerHTML = "";
+      renderMessages(matches, false);
+      currentIndex = 0;
+      toggleScrollButton();
+      applySearchHighlight();
+      updateFloatingDate(true);
+    };
 
-    applySearchHighlight();
+    clearTimeout(searchDebounceTimer);
+    searchDebounceTimer = setTimeout(runSearch, SEARCH_DEBOUNCE_MS);
   }
 
   function openSearch() {
     searchBox.classList.remove("hidden");
     headerMenu.classList.add("hidden");
     searchInput.focus();
-    if (searchInput.value.trim()) {
-      isSearchMode = true;
-      resetChat();
-    }
+    if (searchInput.value.trim()) applySearchFilter();
   }
 
   function closeSearch() {
+    clearTimeout(searchDebounceTimer);
     searchBox.classList.add("hidden");
     searchInput.value = "";
     isSearchMode = false;
@@ -546,7 +754,50 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   menuSearchBtn?.addEventListener("click", openSearch);
+  menuMediaBtn?.addEventListener("click", openMediaPanel);
   menuSwitchBtn?.addEventListener("click", openViewerPicker);
+  mediaCloseBtn?.addEventListener("click", closeMediaPanel);
+  mediaPanel?.addEventListener("click", event => {
+    if (event.target === mediaPanel) closeMediaPanel();
+  });
+  mediaTabs.forEach(tab => {
+    tab.addEventListener("click", () => {
+      setActiveMediaTab(tab.dataset.type);
+      renderMediaList();
+    });
+  });
+  stickerCloseBtn?.addEventListener("click", closeStickerPanel);
+  stickerPanel?.addEventListener("click", event => {
+    if (event.target === stickerPanel) closeStickerPanel();
+  });
+
+  attachBtn?.addEventListener("click", event => {
+    event.stopPropagation();
+    attachMenu?.classList.toggle("hidden");
+  });
+  document.addEventListener("click", event => {
+    if (!attachMenu?.contains(event.target) && event.target !== attachBtn) {
+      attachMenu?.classList.add("hidden");
+    }
+  });
+
+  attachStickerBtn?.addEventListener("click", openStickerPanel);
+  attachFileBtn?.addEventListener("click", () => {
+    attachMenu?.classList.add("hidden");
+    stickerFileInput?.click();
+  });
+  stickerFileInput?.addEventListener("change", async () => {
+    const file = stickerFileInput.files?.[0];
+    stickerFileInput.value = "";
+    if (!file) return;
+
+    if (!/^STK.*\.webp$/i.test(file.name)) {
+      alert("Only sticker files named STK*.webp are allowed.");
+      return;
+    }
+
+    await submitOutgoingMessage(`${file.name} (file attached)`);
+  });
 
   searchCloseBtn?.addEventListener("click", closeSearch);
   searchUpBtn?.addEventListener("click", () => goToSearchResult(-1));
@@ -569,32 +820,14 @@ document.addEventListener("DOMContentLoaded", () => {
   searchInput?.addEventListener("input", applySearchFilter);
 
   sendBtn?.addEventListener("click", async () => {
-    const text = input?.value.trim();
-    if (!text) return;
-
-    try {
-      await sendMessage(text);
-      input.value = "";
-    } catch (error) {
-      console.error(error);
-      alert("Could not send message to Firebase. Please check your Firebase rules/connection.");
-    }
+    await submitOutgoingMessage(input?.value);
   });
 
   input?.addEventListener("keydown", async event => {
     if (event.key !== "Enter") return;
     event.preventDefault();
 
-    const text = input.value.trim();
-    if (!text) return;
-
-    try {
-      await sendMessage(text);
-      input.value = "";
-    } catch (error) {
-      console.error(error);
-      alert("Could not send message to Firebase. Please check your Firebase rules/connection.");
-    }
+    await submitOutgoingMessage(input.value);
   });
 
   updateHeader();
@@ -602,4 +835,10 @@ document.addEventListener("DOMContentLoaded", () => {
   openViewerPicker();
   loadAllChats();
   wireFirebase();
-});
+}
+
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", initChatApp);
+} else {
+  initChatApp();
+}
