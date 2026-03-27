@@ -32,6 +32,7 @@ document.addEventListener("DOMContentLoaded", () => {
   let VIEWER = viewerSelect ? viewerSelect.value : "Mehul";
 
   const CHUNK_SIZE = 200;
+  const SEARCH_DEBOUNCE_MS = 120;
   const imageExt = [".jpg", ".jpeg", ".png", ".webp"];
   const videoExt = [".mp4", ".webm", ".ogg", ".opus"];
   const docExt = [".pdf", ".doc", ".docx", ".ppt", ".pptx", ".xls", ".xlsx", ".zip"];
@@ -52,6 +53,7 @@ document.addEventListener("DOMContentLoaded", () => {
   let firebaseInitialLoadDone = false;
   const loadedFirebaseDocIds = new Set();
   let activeMediaType = "image";
+  let searchDebounceTimer = null;
 
   function syncViewerSelect() {
     if (viewerSelect) viewerSelect.value = VIEWER;
@@ -123,12 +125,39 @@ document.addEventListener("DOMContentLoaded", () => {
       return Number(message.timestamp);
     }
 
-    const inferred = Date.parse(`${message.date} ${message.time || ""}`);
+    const inferred = parseWhatsAppTimestamp(message.date, message.time || "");
     return Number.isFinite(inferred) ? inferred : 0;
   }
 
   function compareMessagesByTime(a, b) {
     return toTimestamp(a) - toTimestamp(b);
+  }
+
+  function parseWhatsAppTimestamp(rawDate, rawTime = "") {
+    const dateMatch = String(rawDate || "").trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+    if (!dateMatch) return NaN;
+
+    let [, dayStr, monthStr, yearStr] = dateMatch;
+    let year = Number(yearStr);
+    if (yearStr.length === 2) year += year >= 70 ? 1900 : 2000;
+
+    const day = Number(dayStr);
+    const monthIndex = Number(monthStr) - 1;
+
+    const timeText = String(rawTime || "").trim().toLowerCase();
+    const timeMatch = timeText.match(/^(\d{1,2}):(\d{2})(?:\s*(am|pm))?$/);
+
+    let hours = 0;
+    let minutes = 0;
+    if (timeMatch) {
+      hours = Number(timeMatch[1]);
+      minutes = Number(timeMatch[2]);
+      const meridiem = timeMatch[3];
+      if (meridiem === "pm" && hours < 12) hours += 12;
+      if (meridiem === "am" && hours === 12) hours = 0;
+    }
+
+    return new Date(year, monthIndex, day, hours, minutes, 0, 0).getTime();
   }
 
   function parseChat(data) {
@@ -139,7 +168,7 @@ document.addEventListener("DOMContentLoaded", () => {
       .map(line => {
         const match = line.match(regex);
         if (!match) return null;
-        const timestamp = Date.parse(`${match[1]} ${match[2]}`);
+        const timestamp = parseWhatsAppTimestamp(match[1], match[2]);
         return {
           date: match[1],
           time: match[2],
@@ -210,7 +239,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
     toggleScrollButton();
     applySearchHighlight();
-    renderMediaList();
+    if (mediaPanel && !mediaPanel.classList.contains("hidden")) renderMediaList();
+  }
+
+  function getSearchFilteredMessages(query) {
+    const queryLower = query.toLowerCase();
+    return allMessages.filter(msg =>
+      `${msg.sender} ${msg.message} ${msg.time} ${msg.date}`.toLowerCase().includes(queryLower)
+    );
   }
 
   function getMediaMessages(type) {
@@ -488,33 +524,36 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function applySearchFilter() {
     const value = searchInput.value.trim();
+    const runSearch = () => {
+      if (!value) {
+        isSearchMode = false;
+        resetChat();
+        return;
+      }
 
-    if (!value) {
-      isSearchMode = false;
-      resetChat();
-      return;
-    }
-
-    if (!isSearchMode) {
+      const matches = getSearchFilteredMessages(value);
       isSearchMode = true;
-      resetChat();
-      return;
-    }
+      chatContainer.innerHTML = "";
+      renderMessages(matches, false);
+      currentIndex = 0;
+      toggleScrollButton();
+      applySearchHighlight();
+      updateFloatingDate(true);
+    };
 
-    applySearchHighlight();
+    clearTimeout(searchDebounceTimer);
+    searchDebounceTimer = setTimeout(runSearch, SEARCH_DEBOUNCE_MS);
   }
 
   function openSearch() {
     searchBox.classList.remove("hidden");
     headerMenu.classList.add("hidden");
     searchInput.focus();
-    if (searchInput.value.trim()) {
-      isSearchMode = true;
-      resetChat();
-    }
+    if (searchInput.value.trim()) applySearchFilter();
   }
 
   function closeSearch() {
+    clearTimeout(searchDebounceTimer);
     searchBox.classList.add("hidden");
     searchInput.value = "";
     isSearchMode = false;
