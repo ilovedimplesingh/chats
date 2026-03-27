@@ -25,6 +25,17 @@ document.addEventListener("DOMContentLoaded", () => {
   const mediaCloseBtn = document.getElementById("media-close");
   const mediaList = document.getElementById("media-list");
   const mediaTabs = [...document.querySelectorAll(".media-tab")];
+<<<<<<< codex/add-media-selection-option-in-menu-c1yqko
+  const stickerPanel = document.getElementById("sticker-panel");
+  const stickerCloseBtn = document.getElementById("sticker-close");
+  const stickerList = document.getElementById("sticker-list");
+  const attachBtn = document.getElementById("attach-btn");
+  const attachMenu = document.getElementById("attach-menu");
+  const attachStickerBtn = document.getElementById("attach-sticker");
+  const attachFileBtn = document.getElementById("attach-file");
+  const stickerFileInput = document.getElementById("sticker-file-input");
+=======
+>>>>>>> main
 
   const input = document.getElementById("msg-input");
   const sendBtn = document.getElementById("send-btn");
@@ -33,6 +44,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const CHUNK_SIZE = 200;
   const SEARCH_DEBOUNCE_MS = 120;
+<<<<<<< codex/add-media-selection-option-in-menu-c1yqko
+  const SEARCH_RESULT_LIMIT = 1500;
+=======
+>>>>>>> main
   const imageExt = [".jpg", ".jpeg", ".png", ".webp"];
   const videoExt = [".mp4", ".webm", ".ogg", ".opus"];
   const docExt = [".pdf", ".doc", ".docx", ".ppt", ".pptx", ".xls", ".xlsx", ".zip"];
@@ -106,14 +121,17 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function normalizeAttachmentName(rawMessage) {
-    let cleaned = rawMessage.trim();
+    let cleaned = String(rawMessage ?? "").trim();
     cleaned = cleaned.replace(/\s*\(file attached\)\s*$/i, "");
     cleaned = cleaned.replace(/^<attached:\s*/i, "").replace(/>$/, "");
     return cleaned.trim();
   }
 
   function getFileType(message) {
-    const cleanMessage = normalizeAttachmentName(message).toLowerCase();
+    const normalized = normalizeAttachmentName(message);
+    if (/^STK.*\.webp$/i.test(normalized)) return "sticker";
+
+    const cleanMessage = normalized.toLowerCase();
     if (imageExt.some(ext => cleanMessage.endsWith(ext))) return "image";
     if (videoExt.some(ext => cleanMessage.endsWith(ext))) return "video";
     if (docExt.some(ext => cleanMessage.endsWith(ext))) return "doc";
@@ -244,9 +262,22 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function getSearchFilteredMessages(query) {
     const queryLower = query.toLowerCase();
+<<<<<<< codex/add-media-selection-option-in-menu-c1yqko
+    const matches = [];
+
+    for (const msg of allMessages) {
+      if (`${msg.sender} ${msg.message} ${msg.time} ${msg.date}`.toLowerCase().includes(queryLower)) {
+        matches.push(msg);
+        if (matches.length >= SEARCH_RESULT_LIMIT) break;
+      }
+    }
+
+    return matches;
+=======
     return allMessages.filter(msg =>
       `${msg.sender} ${msg.message} ${msg.time} ${msg.date}`.toLowerCase().includes(queryLower)
     );
+>>>>>>> main
   }
 
   function getMediaMessages(type) {
@@ -282,7 +313,12 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!mediaMessages.length) {
       const emptyState = document.createElement("p");
       emptyState.className = "media-empty";
+<<<<<<< codex/add-media-selection-option-in-menu-c1yqko
+      const label = activeMediaType === "image" ? "photos" : activeMediaType === "video" ? "videos" : "stickers";
+      emptyState.textContent = `No ${label} in chat yet.`;
+=======
       emptyState.textContent = `No ${activeMediaType === "image" ? "photos" : "videos"} in chat yet.`;
+>>>>>>> main
       mediaList.appendChild(emptyState);
       return;
     }
@@ -298,7 +334,11 @@ document.addEventListener("DOMContentLoaded", () => {
       const previewWrap = document.createElement("div");
       previewWrap.className = "media-preview";
 
+<<<<<<< codex/add-media-selection-option-in-menu-c1yqko
+      if (activeMediaType === "image" || activeMediaType === "sticker") {
+=======
       if (activeMediaType === "image") {
+>>>>>>> main
         const img = document.createElement("img");
         img.src = path;
         img.alt = filename;
@@ -326,6 +366,72 @@ document.addEventListener("DOMContentLoaded", () => {
       });
       mediaList.appendChild(card);
     });
+<<<<<<< codex/add-media-selection-option-in-menu-c1yqko
+  }
+
+  function getStickerNames() {
+    const stickers = new Set();
+    allMessages.forEach(msg => {
+      const name = normalizeAttachmentName(msg.message);
+      if (/^STK.*\.webp$/i.test(name)) stickers.add(name);
+    });
+    return [...stickers].sort((a, b) => b.localeCompare(a));
+  }
+
+  function openStickerPanel() {
+    attachMenu?.classList.add("hidden");
+    renderStickerPicker();
+    stickerPanel?.classList.remove("hidden");
+  }
+
+  function closeStickerPanel() {
+    stickerPanel?.classList.add("hidden");
+  }
+
+  function renderStickerPicker() {
+    if (!stickerList) return;
+    stickerList.innerHTML = "";
+
+    const stickers = getStickerNames();
+    if (!stickers.length) {
+      const emptyState = document.createElement("p");
+      emptyState.className = "media-empty";
+      emptyState.textContent = "No STK*.webp stickers found in chat.";
+      stickerList.appendChild(emptyState);
+      return;
+    }
+
+    stickers.forEach(name => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "media-item";
+      button.innerHTML = `<div class="media-preview"><img src="media/${name}" alt="${name}"></div><div class="media-meta"><strong>${name}</strong></div>`;
+      button.addEventListener("click", async () => {
+        closeStickerPanel();
+        await submitOutgoingMessage(`${name} (file attached)`);
+      });
+      stickerList.appendChild(button);
+    });
+  }
+
+  async function submitOutgoingMessage(text) {
+    const trimmed = String(text || "").trim();
+    if (!trimmed) return;
+
+    if (input) input.value = "";
+    if (sendBtn) sendBtn.disabled = true;
+
+    try {
+      await sendMessage(trimmed);
+    } catch (error) {
+      if (input) input.value = trimmed;
+      console.error(error);
+      alert("Could not send message to Firebase. Please check your Firebase rules/connection.");
+    } finally {
+      if (sendBtn) sendBtn.disabled = false;
+    }
+=======
+>>>>>>> main
   }
 
   function loadInitialMessages() {
@@ -683,6 +789,41 @@ document.addEventListener("DOMContentLoaded", () => {
       renderMediaList();
     });
   });
+<<<<<<< codex/add-media-selection-option-in-menu-c1yqko
+  stickerCloseBtn?.addEventListener("click", closeStickerPanel);
+  stickerPanel?.addEventListener("click", event => {
+    if (event.target === stickerPanel) closeStickerPanel();
+  });
+
+  attachBtn?.addEventListener("click", event => {
+    event.stopPropagation();
+    attachMenu?.classList.toggle("hidden");
+  });
+  document.addEventListener("click", event => {
+    if (!attachMenu?.contains(event.target) && event.target !== attachBtn) {
+      attachMenu?.classList.add("hidden");
+    }
+  });
+
+  attachStickerBtn?.addEventListener("click", openStickerPanel);
+  attachFileBtn?.addEventListener("click", () => {
+    attachMenu?.classList.add("hidden");
+    stickerFileInput?.click();
+  });
+  stickerFileInput?.addEventListener("change", async () => {
+    const file = stickerFileInput.files?.[0];
+    stickerFileInput.value = "";
+    if (!file) return;
+
+    if (!/^STK.*\.webp$/i.test(file.name)) {
+      alert("Only sticker files named STK*.webp are allowed.");
+      return;
+    }
+
+    await submitOutgoingMessage(`${file.name} (file attached)`);
+  });
+=======
+>>>>>>> main
 
   searchCloseBtn?.addEventListener("click", closeSearch);
   searchUpBtn?.addEventListener("click", () => goToSearchResult(-1));
@@ -705,32 +846,14 @@ document.addEventListener("DOMContentLoaded", () => {
   searchInput?.addEventListener("input", applySearchFilter);
 
   sendBtn?.addEventListener("click", async () => {
-    const text = input?.value.trim();
-    if (!text) return;
-
-    try {
-      await sendMessage(text);
-      input.value = "";
-    } catch (error) {
-      console.error(error);
-      alert("Could not send message to Firebase. Please check your Firebase rules/connection.");
-    }
+    await submitOutgoingMessage(input?.value);
   });
 
   input?.addEventListener("keydown", async event => {
     if (event.key !== "Enter") return;
     event.preventDefault();
 
-    const text = input.value.trim();
-    if (!text) return;
-
-    try {
-      await sendMessage(text);
-      input.value = "";
-    } catch (error) {
-      console.error(error);
-      alert("Could not send message to Firebase. Please check your Firebase rules/connection.");
-    }
+    await submitOutgoingMessage(input.value);
   });
 
   updateHeader();

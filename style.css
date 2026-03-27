@@ -9,6 +9,7 @@ body {
 }
 
 .app {
+  position: relative;
   width: 100vw;
   height: 100dvh;
   display: flex;
@@ -348,6 +349,10 @@ video {
 
 .media-filters {
   display: flex;
+<<<<<<< codex/add-media-selection-option-in-menu-c1yqko
+  flex-wrap: wrap;
+=======
+>>>>>>> main
   gap: 8px;
   padding: 10px 14px;
   border-bottom: 1px solid #2a3942;
@@ -467,6 +472,7 @@ video {
 
 /* ✍️ WHATSAPP-LIKE COMPOSER */
 .input-box {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -520,4 +526,36 @@ video {
 
 #send-btn:active {
   transform: scale(0.97);
+}
+
+#send-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.attach-menu {
+  position: absolute;
+  bottom: calc(66px + env(safe-area-inset-bottom));
+  left: 12px;
+  background: #233138;
+  border: 1px solid #2a3942;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  min-width: 210px;
+  overflow: hidden;
+  z-index: 2300;
+}
+
+.attach-menu button {
+  border: none;
+  background: transparent;
+  color: #e9edef;
+  text-align: left;
+  padding: 11px 12px;
+  cursor: pointer;
+}
+
+.attach-menu button:hover {
+  background: #2b3c46;
 }

@@ -55,6 +55,10 @@
       <div class="media-filters">
         <button id="media-tab-photos" class="media-tab active" type="button" data-type="image">Photos</button>
         <button id="media-tab-videos" class="media-tab" type="button" data-type="video">Videos</button>
+<<<<<<< codex/add-media-selection-option-in-menu-c1yqko
+        <button id="media-tab-stickers" class="media-tab" type="button" data-type="sticker">Stickers</button>
+=======
+>>>>>>> main
       </div>
       <div id="media-list" class="media-list"></div>
     </div>
@@ -71,10 +75,27 @@
     </div>
   </div>
 <div class="input-box">
+  <button id="attach-btn" class="icon-btn" aria-label="Open sticker and file options">＋</button>
   <div class="composer">
     <input id="msg-input" placeholder="Message">
   </div>
   <button id="send-btn" aria-label="Send message">➤</button>
+</div>
+
+<div id="attach-menu" class="attach-menu hidden">
+  <button id="attach-sticker" type="button">Sticker (STK*.webp)</button>
+  <button id="attach-file" type="button">Send STK file</button>
+</div>
+<input id="sticker-file-input" class="hidden" type="file" accept=".webp">
+
+<div id="sticker-panel" class="media-panel hidden" role="dialog" aria-modal="true" aria-label="Choose sticker">
+  <div class="media-sheet">
+    <div class="media-head">
+      <h3>Stickers</h3>
+      <button id="sticker-close" class="icon-btn" type="button" aria-label="Close sticker panel">×</button>
+    </div>
+    <div id="sticker-list" class="media-list"></div>
+  </div>
 </div>
 </div>
 
