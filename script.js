@@ -19,7 +19,12 @@ document.addEventListener("DOMContentLoaded", () => {
   const menuBtn = document.getElementById("menu-btn");
   const headerMenu = document.getElementById("header-menu");
   const menuSearchBtn = document.getElementById("menu-search");
+  const menuMediaBtn = document.getElementById("menu-media");
   const menuSwitchBtn = document.getElementById("menu-switch");
+  const mediaPanel = document.getElementById("media-panel");
+  const mediaCloseBtn = document.getElementById("media-close");
+  const mediaList = document.getElementById("media-list");
+  const mediaTabs = [...document.querySelectorAll(".media-tab")];
 
   const input = document.getElementById("msg-input");
   const sendBtn = document.getElementById("send-btn");
@@ -46,6 +51,7 @@ document.addEventListener("DOMContentLoaded", () => {
   let isSearchMode = false;
   let firebaseInitialLoadDone = false;
   const loadedFirebaseDocIds = new Set();
+  let activeMediaType = "image";
 
   function syncViewerSelect() {
     if (viewerSelect) viewerSelect.value = VIEWER;
@@ -204,6 +210,86 @@ document.addEventListener("DOMContentLoaded", () => {
 
     toggleScrollButton();
     applySearchHighlight();
+    renderMediaList();
+  }
+
+  function getMediaMessages(type) {
+    return allMessages
+      .filter(msg => getFileType(msg.message) === type)
+      .sort((a, b) => toTimestamp(b) - toTimestamp(a));
+  }
+
+  function setActiveMediaTab(type) {
+    activeMediaType = type;
+    mediaTabs.forEach(tab => {
+      tab.classList.toggle("active", tab.dataset.type === type);
+    });
+  }
+
+  function openMediaPanel() {
+    headerMenu?.classList.add("hidden");
+    mediaPanel?.classList.remove("hidden");
+    setActiveMediaTab(activeMediaType);
+    renderMediaList();
+  }
+
+  function closeMediaPanel() {
+    mediaPanel?.classList.add("hidden");
+  }
+
+  function renderMediaList() {
+    if (!mediaList) return;
+
+    const mediaMessages = getMediaMessages(activeMediaType);
+    mediaList.innerHTML = "";
+
+    if (!mediaMessages.length) {
+      const emptyState = document.createElement("p");
+      emptyState.className = "media-empty";
+      emptyState.textContent = `No ${activeMediaType === "image" ? "photos" : "videos"} in chat yet.`;
+      mediaList.appendChild(emptyState);
+      return;
+    }
+
+    mediaMessages.forEach(msg => {
+      const filename = normalizeAttachmentName(msg.message);
+      const path = `media/${filename}`;
+
+      const card = document.createElement("button");
+      card.type = "button";
+      card.className = "media-item";
+
+      const previewWrap = document.createElement("div");
+      previewWrap.className = "media-preview";
+
+      if (activeMediaType === "image") {
+        const img = document.createElement("img");
+        img.src = path;
+        img.alt = filename;
+        previewWrap.appendChild(img);
+      } else {
+        const video = document.createElement("video");
+        video.src = path;
+        video.muted = true;
+        video.playsInline = true;
+        previewWrap.appendChild(video);
+      }
+
+      const meta = document.createElement("div");
+      meta.className = "media-meta";
+      meta.innerHTML = `<strong>${msg.date}</strong><span>${msg.time}</span>`;
+
+      card.appendChild(previewWrap);
+      card.appendChild(meta);
+      card.addEventListener("click", () => {
+        closeMediaPanel();
+        const target = [...chatContainer.querySelectorAll(".message")].find(el =>
+          el.dataset.searchText?.includes(`${msg.sender} ${msg.message} ${msg.time} ${msg.date}`.toLowerCase())
+        );
+        target?.scrollIntoView({ behavior: "smooth", block: "center" });
+      });
+      mediaList.appendChild(card);
+    });
   }
 
   function loadInitialMessages() {
@@ -546,7 +632,18 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   menuSearchBtn?.addEventListener("click", openSearch);
+  menuMediaBtn?.addEventListener("click", openMediaPanel);
   menuSwitchBtn?.addEventListener("click", openViewerPicker);
+  mediaCloseBtn?.addEventListener("click", closeMediaPanel);
+  mediaPanel?.addEventListener("click", event => {
+    if (event.target === mediaPanel) closeMediaPanel();
+  });
+  mediaTabs.forEach(tab => {
+    tab.addEventListener("click", () => {
+      setActiveMediaTab(tab.dataset.type);
+      renderMediaList();
+    });
+  });
 
   searchCloseBtn?.addEventListener("click", closeSearch);
   searchUpBtn?.addEventListener("click", () => goToSearchResult(-1));
